@@ -1,0 +1,105 @@
+#include <TM1637Display.h>
+
+#define CLK 3
+#define DIO 4
+
+#define BUTTON 2
+#define BUZZER 8
+#define POT A0
+
+TM1637Display display(CLK, DIO);
+
+unsigned long lastSecond = 0;
+unsigned long buttonPressTime = 0;
+
+int minutes = 25;
+int secondsLeft = 25 * 60;
+
+bool running = false;
+bool lastButtonState = HIGH;
+
+void setup() {
+  pinMode(BUTTON, INPUT_PULLUP);
+  pinMode(BUZZER, OUTPUT);
+
+  display.setBrightness(7);
+
+  showTime();
+}
+
+void loop() {
+
+  // Set timer duration when not running
+  if (!running) {
+    int potValue = analogRead(POT);
+
+    minutes = map(potValue, 0, 1023, 1, 60);
+    secondsLeft = minutes * 60;
+
+    showTime();
+  }
+
+  // Button handling
+  bool buttonState = digitalRead(BUTTON);
+
+  if (lastButtonState == HIGH && buttonState == LOW) {
+    buttonPressTime = millis();
+  }
+
+  if (lastButtonState == LOW && buttonState == HIGH) {
+
+    unsigned long pressLength = millis() - buttonPressTime;
+
+    // Short press = start/pause
+    if (pressLength < 1000) {
+      running = !running;
+    }
+
+    // Long press = reset
+    else {
+      running = false;
+      secondsLeft = minutes * 60;
+      showTime();
+    }
+  }
+
+  lastButtonState = buttonState;
+
+  // Countdown
+  if (running && millis() - lastSecond >= 1000) {
+
+    lastSecond = millis();
+
+    if (secondsLeft > 0) {
+      secondsLeft--;
+      showTime();
+    }
+
+    else {
+      running = false;
+
+      // Alarm
+      for (int i = 0; i < 5; i++) {
+        tone(BUZZER, 2000);
+        delay(300);
+
+        noTone(BUZZER);
+        delay(200);
+      }
+    }
+  }
+}
+
+void showTime() {
+
+  int mins = secondsLeft / 60;
+  int secs = secondsLeft % 60;
+
+  int displayNumber = mins * 100 + secs;
+
+  display.showNumberDecEx(
+    displayNumber,
+    0b01000000,
+    true
+  );
+}
